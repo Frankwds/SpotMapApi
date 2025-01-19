@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpotMapApi", "SpotMapApi.csproj", "{6F2A4A2A-FF6A-43B6-9076-AC19EC0BC519}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6F2A4A2A-FF6A-43B6-9076-AC19EC0BC519}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F2A4A2A-FF6A-43B6-9076-AC19EC0BC519}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F2A4A2A-FF6A-43B6-9076-AC19EC0BC519}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F2A4A2A-FF6A-43B6-9076-AC19EC0BC519}.Release|Any CPU.Build.0 = Release|Any CPU
+		{254CC9BB-37B2-482A-B093-91D5AB925146}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{254CC9BB-37B2-482A-B093-91D5AB925146}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{254CC9BB-37B2-482A-B093-91D5AB925146}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{254CC9BB-37B2-482A-B093-91D5AB925146}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
