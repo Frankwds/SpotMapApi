@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SpotMapApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+de207590c7cd82f97f47cba0745d3a0379020377")]
 [assembly: System.Reflection.AssemblyProductAttribute("SpotMapApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SpotMapApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

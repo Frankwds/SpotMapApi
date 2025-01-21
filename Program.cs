@@ -1,7 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using DotNetEnv;
+
+// Load environment variables from .env file
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -18,20 +24,15 @@ builder.Services.AddCors(options =>
 
 // Add DbContext
 builder.Services.AddDbContext<MarkerContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("MarkerContext")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MarkerContext")));
 
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
+app.UseSwagger();
+app.UseSwaggerUI();
 app.UseCors(MyAllowSpecificOrigins);
-
 app.UseHttpsRedirection();
 
 // Initialize the database
@@ -39,7 +40,6 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<MarkerContext>();
-    context.Database.EnsureCreated();
 }
 
 app.MapGet("/markers", async (MarkerContext context, ILogger<Program> logger) =>
