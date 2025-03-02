@@ -49,7 +49,11 @@ app.MapGet("/markers", async (MarkerContext context, ILogger<Program> logger) =>
 
 app.MapPost("/markers", async (MarkerPost markerPost, MarkerContext context, ILogger<Program> logger) =>
 {
-    var newMarker = new Marker(0, markerPost.Name, markerPost.Latitude, markerPost.Longitude);
+    var newMarker = new Marker
+    {
+        Name = markerPost.Name,
+        Position = markerPost.Position
+    };
     context.Markers.Add(newMarker);
     await context.SaveChangesAsync();
     logger.LogInformation($"Marker was added: {newMarker}");

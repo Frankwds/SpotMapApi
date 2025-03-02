@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace SpotMapApi.Migrations
 {
     [DbContext(typeof(MarkerContext))]
-    [Migration("20250121182252_InitialCreate")]
+    [Migration("20250302150026_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -31,12 +31,6 @@ namespace SpotMapApi.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("float");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -44,6 +38,31 @@ namespace SpotMapApi.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Markers");
+                });
+
+            modelBuilder.Entity("Marker", b =>
+                {
+                    b.OwnsOne("Coordinates", "Position", b1 =>
+                        {
+                            b1.Property<int>("MarkerId")
+                                .HasColumnType("int");
+
+                            b1.Property<double>("Lat")
+                                .HasColumnType("float");
+
+                            b1.Property<double>("Lng")
+                                .HasColumnType("float");
+
+                            b1.HasKey("MarkerId");
+
+                            b1.ToTable("Markers");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MarkerId");
+                        });
+
+                    b.Navigation("Position")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

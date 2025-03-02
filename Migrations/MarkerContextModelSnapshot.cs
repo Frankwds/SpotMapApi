@@ -28,12 +28,6 @@ namespace SpotMapApi.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<double>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("float");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -41,6 +35,31 @@ namespace SpotMapApi.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Markers");
+                });
+
+            modelBuilder.Entity("Marker", b =>
+                {
+                    b.OwnsOne("Coordinates", "Position", b1 =>
+                        {
+                            b1.Property<int>("MarkerId")
+                                .HasColumnType("int");
+
+                            b1.Property<double>("Lat")
+                                .HasColumnType("float");
+
+                            b1.Property<double>("Lng")
+                                .HasColumnType("float");
+
+                            b1.HasKey("MarkerId");
+
+                            b1.ToTable("Markers");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MarkerId");
+                        });
+
+                    b.Navigation("Position")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
