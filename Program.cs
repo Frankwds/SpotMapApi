@@ -19,6 +19,8 @@ builder.Services.AddCors(options =>
     {
         policy.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin();
         policy.WithOrigins("http://localhost:3000");
+        policy.WithOrigins("https://spotmap-87908029539.europe-north1.run.app");
+        policy.WithOrigins("https://spotmap-enbsdcfhh0h4b0ep.swedencentral-01.azurewebsites.net/");
     });
 });
 
