@@ -20,6 +20,7 @@ public class Marker
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public Coordinates Position { get; set; } = new Coordinates(0, 0);
+    public string Type { get; set; } = string.Empty;
 }
 
-public record MarkerPost(string Name, Coordinates Position);
+public record MarkerPost(string Name, Coordinates Position, string Type);

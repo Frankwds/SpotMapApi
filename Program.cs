@@ -52,7 +52,8 @@ app.MapPost("/markers", async (MarkerPost markerPost, MarkerContext context, ILo
     var newMarker = new Marker
     {
         Name = markerPost.Name,
-        Position = markerPost.Position
+        Position = markerPost.Position,
+        Type = markerPost.Type
     };
     context.Markers.Add(newMarker);
     await context.SaveChangesAsync();
