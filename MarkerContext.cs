@@ -21,6 +21,9 @@ public class Marker
     public string Name { get; set; } = string.Empty;
     public Coordinates Position { get; set; } = new Coordinates(0, 0);
     public string Type { get; set; } = string.Empty;
+    public int UserId { get; set; } = 0;
 }
 
-public record MarkerPost(string Name, Coordinates Position, string Type);
+public record MarkerPost(string Name, Coordinates Position, string Type, int UserId);
+
+

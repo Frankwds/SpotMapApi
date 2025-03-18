@@ -25,10 +25,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<MarkerContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MarkerContext")));
 
-
-var app = builder.Build();
-
 // Configure the HTTP request pipeline.
+var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors(MyAllowSpecificOrigins);
@@ -53,7 +51,8 @@ app.MapPost("/markers", async (MarkerPost markerPost, MarkerContext context, ILo
     {
         Name = markerPost.Name,
         Position = markerPost.Position,
-        Type = markerPost.Type
+        Type = markerPost.Type,
+        UserId = markerPost.UserId
     };
     context.Markers.Add(newMarker);
     await context.SaveChangesAsync();
