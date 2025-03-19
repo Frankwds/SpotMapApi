@@ -3,16 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using SpotMapApi.Data;
 
 #nullable disable
 
 namespace SpotMapApi.Migrations
 {
-    [DbContext(typeof(MarkerContext))]
-    partial class MarkerContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20250319204241_RefacRestartMigration")]
+    partial class RefacRestartMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,7 +25,7 @@ namespace SpotMapApi.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Marker", b =>
+            modelBuilder.Entity("SpotMapApi.Models.Entities.Marker", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -29,9 +33,18 @@ namespace SpotMapApi.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<double?>("Rating")
+                        .HasColumnType("float");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -47,7 +60,7 @@ namespace SpotMapApi.Migrations
                     b.ToTable("Markers");
                 });
 
-            modelBuilder.Entity("User", b =>
+            modelBuilder.Entity("SpotMapApi.Models.Entities.User", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -74,13 +87,13 @@ namespace SpotMapApi.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("Marker", b =>
+            modelBuilder.Entity("SpotMapApi.Models.Entities.Marker", b =>
                 {
-                    b.HasOne("User", "User")
+                    b.HasOne("SpotMapApi.Models.Entities.User", "User")
                         .WithMany("Markers")
                         .HasForeignKey("UserId");
 
-                    b.OwnsOne("Coordinates", "Position", b1 =>
+                    b.OwnsOne("SpotMapApi.Models.Entities.Coordinates", "Position", b1 =>
                         {
                             b1.Property<int>("MarkerId")
                                 .HasColumnType("int");
@@ -105,7 +118,7 @@ namespace SpotMapApi.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("User", b =>
+            modelBuilder.Entity("SpotMapApi.Models.Entities.User", b =>
                 {
                     b.Navigation("Markers");
                 });

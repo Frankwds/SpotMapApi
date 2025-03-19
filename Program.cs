@@ -3,29 +3,70 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DotNetEnv;
-using System.Security.Claims;
+using SpotMapApi.Data;
+using SpotMapApi.Data.UnitOfWork;
+using SpotMapApi.Services.Auth;
+using SpotMapApi.Services.Markers;
+using SpotMapApi.Features.Auth;
+using SpotMapApi.Features.Markers;
+using SpotMapApi.Infrastructure.Configuration;
 
 // Load environment variables from .env file
 Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add environment variables to configuration
-builder.Configuration["Jwt:SecretKey"] = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-builder.Configuration["Jwt:Issuer"] = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "SpotMapApi";
-builder.Configuration["Jwt:Audience"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "SpotMapClient";
-builder.Configuration["Jwt:AccessTokenExpiryInMinutes"] = Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES") ?? "15";
-builder.Configuration["Jwt:RefreshTokenExpiryInDays"] = Environment.GetEnvironmentVariable("JWT_REFRESH_TOKEN_EXPIRY_DAYS") ?? "7";
+// Configure typed settings from environment variables
+var jwtSettings = new JwtSettings
+{
+    SecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? builder.Configuration["Jwt:SecretKey"] ?? "",
+    Issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? builder.Configuration["Jwt:Issuer"] ?? "SpotMapApi",
+    Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"] ?? "SpotMapClient",
+    AccessTokenExpiryInMinutes = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES") ?? 
+                                builder.Configuration["Jwt:AccessTokenExpiryInMinutes"] ?? "15"),
+    RefreshTokenExpiryInDays = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_REFRESH_TOKEN_EXPIRY_DAYS") ?? 
+                              builder.Configuration["Jwt:RefreshTokenExpiryInDays"] ?? "7")
+};
 
-// Set Google configuration from environment variables
-builder.Configuration["Google:ClientId"] = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
-builder.Configuration["Google:ClientSecret"] = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET");
+var googleSettings = new GoogleSettings
+{
+    ClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? builder.Configuration["Google:ClientId"] ?? "",
+    ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? builder.Configuration["Google:ClientSecret"] ?? "",
+    RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI") ?? builder.Configuration["Google:RedirectUri"] ?? "http://localhost:3000"
+};
+
+// Add settings to configuration
+builder.Services.Configure<JwtSettings>(opts => 
+{
+    opts.SecretKey = jwtSettings.SecretKey;
+    opts.Issuer = jwtSettings.Issuer;
+    opts.Audience = jwtSettings.Audience;
+    opts.AccessTokenExpiryInMinutes = jwtSettings.AccessTokenExpiryInMinutes;
+    opts.RefreshTokenExpiryInDays = jwtSettings.RefreshTokenExpiryInDays;
+});
+
+builder.Services.Configure<GoogleSettings>(opts =>
+{
+    opts.ClientId = googleSettings.ClientId;
+    opts.ClientSecret = googleSettings.ClientSecret;
+    opts.RedirectUri = googleSettings.RedirectUri;
+});
+
+// Manual configuration settings for backward compatibility
+builder.Configuration["Jwt:SecretKey"] = jwtSettings.SecretKey;
+builder.Configuration["Jwt:Issuer"] = jwtSettings.Issuer;
+builder.Configuration["Jwt:Audience"] = jwtSettings.Audience;
+builder.Configuration["Jwt:AccessTokenExpiryInMinutes"] = jwtSettings.AccessTokenExpiryInMinutes.ToString();
+builder.Configuration["Jwt:RefreshTokenExpiryInDays"] = jwtSettings.RefreshTokenExpiryInDays.ToString();
+builder.Configuration["Google:ClientId"] = googleSettings.ClientId;
+builder.Configuration["Google:ClientSecret"] = googleSettings.ClientSecret;
+
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Add services to the container
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: MyAllowSpecificOrigins, policy =>
@@ -34,16 +75,24 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add DbContext
+// Configure DbContext and repositories
 var connectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING") ??
-                      builder.Configuration.GetConnectionString("MarkerContext");
+                      builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddDbContext<MarkerContext>(options =>
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-// Register auth services
-builder.Services.AddSingleton<JwtService>();
-builder.Services.AddScoped<GoogleAuthService>();
+// Register repositories and services
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Register infrastructure services
+builder.Services.AddSingleton<IJwtService, SpotMapApi.Infrastructure.Auth.JwtService>();
+builder.Services.AddScoped<SpotMapApi.Infrastructure.Auth.GoogleTokenService>();
+
+// Register domain services
+builder.Services.AddScoped<IGoogleAuthService, SpotMapApi.Services.Auth.GoogleAuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IMarkerService, MarkerService>();
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(options =>
@@ -58,16 +107,19 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "SpotMapApi",
-        ValidAudience = builder.Configuration["Jwt:Audience"] ?? "SpotMapClient",
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key is not configured")))
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+            jwtSettings.SecretKey ?? throw new InvalidOperationException("JWT Secret Key is not configured")))
     };
 });
 
 builder.Services.AddAuthorization();
 
-// Configure the HTTP request pipeline.
+// Build the application
 var app = builder.Build();
+
+// Configure the HTTP request pipeline
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors(MyAllowSpecificOrigins);
@@ -79,144 +131,27 @@ app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<MarkerContext>();
+    var context = services.GetRequiredService<ApplicationDbContext>();
     var logger = services.GetRequiredService<ILogger<Program>>();
 
     try
     {
-        // Run database migrations
-        context.Database.Migrate();
-
-        // Check if we need to migrate marker data
-        if (context.Markers.Any() && !context.Users.Any())
-        {
-            logger.LogInformation("Migrating existing markers to user accounts...");
-            await DataMigration.MigrateMarkersToUserIds(context);
-        }
+        // Early development - recreate database to ensure fresh schema
+        logger.LogInformation("Recreating database with latest schema");
+        context.Database.EnsureDeleted();
+        context.Database.EnsureCreated();
+        
+        logger.LogInformation("Database successfully initialized");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while migrating the database");
+        logger.LogError(ex, "An error occurred while initializing the database");
     }
 }
 
 
-// Auth endpoints
-app.MapPost("/api/auth/google", async (GoogleAuthRequest request, GoogleAuthService authService) =>
-{
-    try
-    {
-        var authResponse = await authService.AuthenticateWithGoogleAsync(request.AuthCode);
-        return Results.Ok(authResponse);
-    }
-    catch (Exception ex)
-    {
-        return Results.BadRequest(new { error = "Invalid authentication code", details = ex.Message });
-    }
-}).WithName("GoogleAuth").WithOpenApi();
-
-// Additional models
-
-
-
-app.MapPost("/api/auth/refresh", async (RefreshRequest refreshRequest, MarkerContext context, JwtService jwtService) =>
-{
-    var refreshToken = refreshRequest.RefreshToken;
-    var accessToken = refreshRequest.AccessToken;
-
-    var principal = jwtService.GetPrincipalFromExpiredToken(accessToken);
-    var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-
-    var user = await context.Users
-        .FirstOrDefaultAsync(u => u.Id == userId && u.RefreshToken == refreshToken);
-
-    if (user == null || user.RefreshTokenExpiryTime <= DateTime.Now)
-    {
-        return Results.BadRequest(new { error = "Invalid token" });
-    }
-
-    var newAccessToken = jwtService.GenerateAccessToken(user);
-    var newRefreshToken = jwtService.GenerateRefreshToken();
-
-    user.RefreshToken = newRefreshToken;
-    await context.SaveChangesAsync();
-
-    return Results.Ok(new
-    {
-        accessToken = newAccessToken,
-        refreshToken = newRefreshToken,
-        expiresIn = Convert.ToInt32(builder.Configuration["Jwt:AccessTokenExpiryInMinutes"]) * 60
-    });
-}).WithName("RefreshToken").WithOpenApi();
-
-app.MapPost("/api/auth/logout", async (MarkerContext context, HttpContext httpContext) =>
-{
-    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-    var user = await context.Users.FirstOrDefaultAsync(u => u.Id == userId && u.RefreshToken == request.RefreshToken);
-
-    if (user != null)
-    {
-        user.RefreshToken = null;
-        user.RefreshTokenExpiryTime = null;
-        await context.SaveChangesAsync();
-    }
-
-    return Results.Ok(new { message = "Logged out successfully" });
-}).WithName("Logout").RequireAuthorization().WithOpenApi();
-
-// Marker endpoints
-app.MapGet("/markers", async (MarkerContext context, ILogger<Program> logger) =>
-{
-    logger.LogInformation("Markers endpoint was called.");
-    return await context.Markers.ToListAsync();
-}).WithName("GetMarkers").WithOpenApi();
-
-app.MapPost("/markers", async (MarkerPost markerPost, MarkerContext context, HttpContext httpContext, ILogger<Program> logger) =>
-{
-    // Get the user ID from the JWT claims
-    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-
-    var newMarker = new Marker
-    {
-        Name = markerPost.Name,
-        Position = markerPost.Position,
-        Type = markerPost.Type,
-        UserId = userId
-    };
-    context.Markers.Add(newMarker);
-    await context.SaveChangesAsync();
-    logger.LogInformation($"Marker was added: {newMarker}");
-    return newMarker;
-}).WithName("AddMarker").RequireAuthorization().WithOpenApi();
-
-app.MapDelete("/markers/{id}", async (int id, MarkerContext context, HttpContext httpContext, ILogger<Program> logger) =>
-{
-    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-    var marker = await context.Markers.FindAsync(id);
-    if (marker == null)
-    {
-        return Results.NotFound();
-    }
-
-    // Verify ownership
-    if (marker.UserId != userId)
-    {
-        return Results.Forbid();
-    }
-
-    context.Markers.Remove(marker);
-    await context.SaveChangesAsync();
-    logger.LogInformation($"Marker was deleted. id: {id}");
-    return Results.Ok(marker);
-}).WithName("DeleteMarker").RequireAuthorization().WithOpenApi();
+// Map API endpoints
+app.MapAuthEndpoints();
+app.MapMarkerEndpoints();
 
 app.Run();
-
-// Additional models
-public record RefreshRequest(string AccessToken, string RefreshToken);
-
-public class GoogleAuthRequest
-{
-    public string AuthCode { get; set; }
-}
