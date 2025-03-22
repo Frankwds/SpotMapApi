@@ -32,7 +32,7 @@ var googleSettings = new GoogleSettings
 {
     ClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? builder.Configuration["Google:ClientId"] ?? "",
     ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? builder.Configuration["Google:ClientSecret"] ?? "",
-    RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI") ?? builder.Configuration["Google:RedirectUri"] ?? "https://spotmapweb-g2dthgcghpghcjfs.canadacentral-01.azurewebsites.net"
+    RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI") ?? builder.Configuration["Google:RedirectUri"] ?? ""
 };
 
 // Add settings to configuration
@@ -60,6 +60,7 @@ builder.Configuration["Jwt:AccessTokenExpiryInMinutes"] = jwtSettings.AccessToke
 builder.Configuration["Jwt:RefreshTokenExpiryInDays"] = jwtSettings.RefreshTokenExpiryInDays.ToString();
 builder.Configuration["Google:ClientId"] = googleSettings.ClientId;
 builder.Configuration["Google:ClientSecret"] = googleSettings.ClientSecret;
+builder.Configuration["Google:RedirectUri"] = googleSettings.RedirectUri;
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
@@ -138,7 +139,7 @@ using (var scope = app.Services.CreateScope())
     {
         // Early development - recreate database to ensure fresh schema
         logger.LogInformation("Recreating database with latest schema");
-        context.Database.EnsureDeleted();
+        // context.Database.EnsureDeleted(); //TODO delete line
         context.Database.EnsureCreated();
 
         logger.LogInformation("Database successfully initialized");
