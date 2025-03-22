@@ -22,9 +22,9 @@ var jwtSettings = new JwtSettings
     SecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? builder.Configuration["Jwt:SecretKey"] ?? "",
     Issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? builder.Configuration["Jwt:Issuer"] ?? "SpotMapApi",
     Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"] ?? "SpotMapClient",
-    AccessTokenExpiryInMinutes = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES") ?? 
+    AccessTokenExpiryInMinutes = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES") ??
                                 builder.Configuration["Jwt:AccessTokenExpiryInMinutes"] ?? "15"),
-    RefreshTokenExpiryInDays = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_REFRESH_TOKEN_EXPIRY_DAYS") ?? 
+    RefreshTokenExpiryInDays = Convert.ToInt32(Environment.GetEnvironmentVariable("JWT_REFRESH_TOKEN_EXPIRY_DAYS") ??
                               builder.Configuration["Jwt:RefreshTokenExpiryInDays"] ?? "7")
 };
 
@@ -32,11 +32,11 @@ var googleSettings = new GoogleSettings
 {
     ClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? builder.Configuration["Google:ClientId"] ?? "",
     ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? builder.Configuration["Google:ClientSecret"] ?? "",
-    RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI") ?? builder.Configuration["Google:RedirectUri"] ?? "http://localhost:3000"
+    RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI") ?? builder.Configuration["Google:RedirectUri"] ?? "https://spotmapweb-g2dthgcghpghcjfs.canadacentral-01.azurewebsites.net"
 };
 
 // Add settings to configuration
-builder.Services.Configure<JwtSettings>(opts => 
+builder.Services.Configure<JwtSettings>(opts =>
 {
     opts.SecretKey = jwtSettings.SecretKey;
     opts.Issuer = jwtSettings.Issuer;
@@ -140,7 +140,7 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Recreating database with latest schema");
         context.Database.EnsureDeleted();
         context.Database.EnsureCreated();
-        
+
         logger.LogInformation("Database successfully initialized");
     }
     catch (Exception ex)
