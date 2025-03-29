@@ -31,6 +31,20 @@ namespace SpotMapApi.Features.Markers
                 var markers = await markerService.GetMarkersByUserIdAsync(userId);
                 return Results.Ok(markers);
             }).WithName("GetUserMarkers").RequireAuthorization().WithOpenApi();
+            
+            endpoints.MapGet("/api/markers/user", async (IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Results.Unauthorized();
+                }
+                
+                logger.LogInformation($"Get user markers endpoint '/api/markers/user' was called by user {userId}");
+                var markers = await markerService.GetMarkersByUserIdAsync(userId);
+                return Results.Ok(markers);
+            }).WithName("GetCurrentUserMarkers").RequireAuthorization().WithOpenApi();
 
             endpoints.MapGet("/api/markers/{id}", async (int id, IMarkerService markerService) =>
             {
