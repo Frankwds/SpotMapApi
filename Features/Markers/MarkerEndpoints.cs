@@ -85,6 +85,106 @@ namespace SpotMapApi.Features.Markers
                 logger.LogInformation($"Marker was deleted. id: {id}");
                 return Results.Ok();
             }).WithName("DeleteMarker").RequireAuthorization().WithOpenApi();
+            
+            // New endpoints for frontend functionality
+            
+            // Update marker endpoint
+            endpoints.MapPut("/api/markers/{id}", async (int id, MarkerUpdateRequest request, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Results.Unauthorized();
+                }
+                
+                var marker = await markerService.UpdateMarkerAsync(id, request, userId);
+                
+                if (marker == null)
+                {
+                    return Results.NotFound();
+                }
+                
+                logger.LogInformation($"Marker {id} was updated by user {userId}");
+                return Results.Ok(marker);
+            }).WithName("UpdateMarker").RequireAuthorization().WithOpenApi();
+            
+            // Rate marker endpoint
+            endpoints.MapPost("/api/markers/{id}/rate", async (int id, MarkerRatingRequest ratingRequest, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Results.Unauthorized();
+                }
+                
+                var marker = await markerService.RateMarkerAsync(id, ratingRequest.Rating, userId);
+                
+                if (marker == null)
+                {
+                    return Results.NotFound();
+                }
+                
+                logger.LogInformation($"Marker {id} was rated {ratingRequest.Rating} by user {userId}");
+                return Results.Ok(marker);
+            }).WithName("RateMarker").RequireAuthorization().WithOpenApi();
+            
+            // Upload image to marker
+            endpoints.MapPost("/api/markers/{id}/images", async (int id, HttpRequest request, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Results.Unauthorized();
+                }
+                
+                var form = await request.ReadFormAsync();
+                var file = form.Files["image"];
+                bool.TryParse(form["isMainImage"], out bool isMainImage);
+                
+                if (file == null || file.Length == 0)
+                {
+                    return Results.BadRequest(new { error = "No image file provided" });
+                }
+                
+                var marker = await markerService.UploadImageAsync(id, file, isMainImage, userId);
+                
+                if (marker == null)
+                {
+                    return Results.NotFound();
+                }
+                
+                logger.LogInformation($"Image uploaded for marker {id}, isMainImage: {isMainImage}");
+                return Results.Ok(marker);
+            }).WithName("UploadMarkerImage").RequireAuthorization().WithOpenApi();
+            
+            // Delete image from marker
+            endpoints.MapDelete("/api/markers/{id}/images", async (int id, string imageUrl, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Results.Unauthorized();
+                }
+                
+                if (string.IsNullOrEmpty(imageUrl))
+                {
+                    return Results.BadRequest(new { error = "Image URL is required" });
+                }
+                
+                var marker = await markerService.DeleteImageAsync(id, imageUrl, userId);
+                
+                if (marker == null)
+                {
+                    return Results.NotFound();
+                }
+                
+                logger.LogInformation($"Image deleted for marker {id}: {imageUrl}");
+                return Results.Ok(marker);
+            }).WithName("DeleteMarkerImage").RequireAuthorization().WithOpenApi();
         }
     }
 }

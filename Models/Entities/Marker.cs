@@ -11,10 +11,18 @@ namespace SpotMapApi.Models.Entities
         public string Type { get; set; } = string.Empty;
         public string? UserId { get; set; }
         public User? User { get; set; }
-        // New properties to support future functionality
         public string? Description { get; set; }
         public string? ImageUrl { get; set; }
         public double? Rating { get; set; }
+        public List<MarkerImage> AdditionalImages { get; set; } = new List<MarkerImage>();
+    }
+
+    public class MarkerImage
+    {
+        public int Id { get; set; }
+        public int MarkerId { get; set; }
+        public Marker? Marker { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
     }
 
     public record Coordinates(double Lat, double Lng);

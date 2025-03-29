@@ -95,6 +95,10 @@ builder.Services.AddScoped<IGoogleAuthService, SpotMapApi.Services.Auth.GoogleAu
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMarkerService, MarkerService>();
 
+// Configure static files for image uploads
+builder.Services.AddDirectoryBrowser();
+builder.Services.AddHttpContextAccessor();
+
 // Configure JWT authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -125,6 +129,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors(MyAllowSpecificOrigins);
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // For serving images
 app.UseAuthentication();
 app.UseAuthorization();
 

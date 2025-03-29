@@ -17,10 +17,17 @@ namespace SpotMapApi.Data
                 .WithOne(m => m.User)
                 .HasForeignKey(m => m.UserId);
                 
+            modelBuilder.Entity<Marker>()
+                .HasMany(m => m.AdditionalImages)
+                .WithOne(img => img.Marker)
+                .HasForeignKey(img => img.MarkerId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
             base.OnModelCreating(modelBuilder);
         }
 
         public DbSet<Marker> Markers { get; set; } = null!;
         public DbSet<User> Users { get; set; } = null!;
+        public DbSet<MarkerImage> MarkerImages { get; set; } = null!;
     }
 }

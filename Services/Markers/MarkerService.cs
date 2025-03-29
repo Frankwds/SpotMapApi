@@ -1,6 +1,10 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using SpotMapApi.Data.UnitOfWork;
 using SpotMapApi.Models.DTOs;
 using SpotMapApi.Models.Entities;
+using System.IO;
+using System.Linq;
 
 namespace SpotMapApi.Services.Markers
 {
@@ -8,11 +12,13 @@ namespace SpotMapApi.Services.Markers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<MarkerService> _logger;
+        private readonly IWebHostEnvironment _environment;
 
-        public MarkerService(IUnitOfWork unitOfWork, ILogger<MarkerService> logger)
+        public MarkerService(IUnitOfWork unitOfWork, ILogger<MarkerService> logger, IWebHostEnvironment environment)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _environment = environment;
         }
 
         public async Task<IEnumerable<MarkerResponse>> GetAllMarkersAsync()
@@ -66,11 +72,182 @@ namespace SpotMapApi.Services.Markers
                 return false;
             }
 
+            // Delete image files if exists
+            if (!string.IsNullOrEmpty(marker.ImageUrl))
+            {
+                DeleteImageFile(marker.ImageUrl);
+            }
+            
+            // Delete additional image files
+            foreach (var additionalImage in marker.AdditionalImages)
+            {
+                DeleteImageFile(additionalImage.ImageUrl);
+            }
+
             await _unitOfWork.Markers.DeleteAsync(marker);
             await _unitOfWork.SaveChangesAsync();
             
             _logger.LogInformation($"Marker was deleted. id: {id}");
             return true;
+        }
+        
+        public async Task<MarkerResponse?> UpdateMarkerAsync(int id, MarkerUpdateRequest request, string userId)
+        {
+            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            
+            if (marker == null)
+            {
+                return null;
+            }
+
+            if (marker.UserId != userId)
+            {
+                _logger.LogWarning($"Unauthorized attempt to update marker {id} by user {userId}");
+                return null;
+            }
+
+            // Update only the properties that are not null in the request
+            if (request.Name != null)
+                marker.Name = request.Name;
+                
+            if (request.Position != null)
+                marker.Position = request.Position;
+                
+            if (request.Type != null)
+                marker.Type = request.Type;
+                
+            if (request.Description != null)
+                marker.Description = request.Description;
+
+            await _unitOfWork.Markers.UpdateAsync(marker);
+            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation($"Marker was updated: {marker.Id}");
+            return MapToMarkerResponse(marker);
+        }
+
+        public async Task<MarkerResponse?> RateMarkerAsync(int id, double rating, string userId)
+        {
+            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            
+            if (marker == null)
+            {
+                return null;
+            }
+
+            // Allow any authenticated user to rate a marker
+            marker.Rating = rating;
+
+            await _unitOfWork.Markers.UpdateAsync(marker);
+            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation($"Marker {id} was rated {rating} by user {userId}");
+            return MapToMarkerResponse(marker);
+        }
+
+        public async Task<MarkerResponse?> UploadImageAsync(int id, IFormFile image, bool isMainImage, string userId)
+        {
+            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            
+            if (marker == null)
+            {
+                return null;
+            }
+
+            if (marker.UserId != userId)
+            {
+                _logger.LogWarning($"Unauthorized attempt to upload image for marker {id} by user {userId}");
+                return null;
+            }
+
+            if (image == null || image.Length == 0)
+            {
+                _logger.LogWarning("No image file provided");
+                return null;
+            }
+
+            var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "markers");
+            Directory.CreateDirectory(uploadsFolder); // Ensure directory exists
+            
+            var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+            
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await image.CopyToAsync(fileStream);
+            }
+            
+            var imageUrl = $"/uploads/markers/{uniqueFileName}";
+            
+            if (isMainImage)
+            {
+                // Delete previous main image if exists
+                if (!string.IsNullOrEmpty(marker.ImageUrl))
+                {
+                    DeleteImageFile(marker.ImageUrl);
+                }
+                
+                marker.ImageUrl = imageUrl;
+            }
+            else
+            {
+                // Add to additional images
+                var newImage = new MarkerImage
+                {
+                    MarkerId = marker.Id,
+                    ImageUrl = imageUrl
+                };
+                
+                marker.AdditionalImages.Add(newImage);
+            }
+            
+            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation($"Image uploaded for marker {id}, isMainImage: {isMainImage}");
+            return MapToMarkerResponse(marker);
+        }
+
+        public async Task<MarkerResponse?> DeleteImageAsync(int id, string imageUrl, string userId)
+        {
+            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            
+            if (marker == null)
+            {
+                return null;
+            }
+
+            if (marker.UserId != userId)
+            {
+                _logger.LogWarning($"Unauthorized attempt to delete image for marker {id} by user {userId}");
+                return null;
+            }
+            
+            if (marker.ImageUrl == imageUrl)
+            {
+                // Delete main image
+                DeleteImageFile(imageUrl);
+                marker.ImageUrl = null;
+            }
+            else
+            {
+                // Delete from additional images
+                var imageToDelete = marker.AdditionalImages.FirstOrDefault(i => i.ImageUrl == imageUrl);
+                if (imageToDelete != null)
+                {
+                    marker.AdditionalImages.Remove(imageToDelete);
+                    DeleteImageFile(imageUrl);
+                }
+                else
+                {
+                    _logger.LogWarning($"Image URL {imageUrl} not found for marker {id}");
+                    return null;
+                }
+            }
+            
+            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation($"Image {imageUrl} deleted for marker {id}");
+            return MapToMarkerResponse(marker);
         }
 
         private static MarkerResponse MapToMarkerResponse(Marker marker)
@@ -81,8 +258,35 @@ namespace SpotMapApi.Services.Markers
                 marker.Position,
                 marker.Type,
                 marker.UserId ?? string.Empty,
-                marker.User?.Name
+                marker.User?.Name,
+                marker.Description,
+                marker.ImageUrl,
+                marker.Rating,
+                marker.AdditionalImages?.Select(img => img.ImageUrl).ToList()
             );
+        }
+        
+        private void DeleteImageFile(string imageUrl)
+        {
+            if (string.IsNullOrEmpty(imageUrl))
+                return;
+                
+            try
+            {
+                // Extract file path from URL
+                var fileName = Path.GetFileName(imageUrl);
+                var filePath = Path.Combine(_environment.WebRootPath, "uploads", "markers", fileName);
+                
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    _logger.LogInformation($"Deleted image file: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting image file: {imageUrl}");
+            }
         }
     }
 }
