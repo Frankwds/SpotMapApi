@@ -4,21 +4,24 @@
 - Build: `dotnet build`
 - Run: `dotnet run`
 - Watch mode: `dotnet watch run`
-- Test: `dotnet test`
-- Migrations: `dotnet ef migrations add <MigrationName>`, `dotnet ef database update`
+- Test all: `dotnet test`
+- Test specific: `dotnet test --filter "FullyQualifiedName~TestNamespace.TestClass.TestMethod"`
+- Create migration: `dotnet ef migrations add <MigrationName>`
+- Update database: `dotnet ef database update`
 
 ## Code Style Guidelines
-- Use C# record types for DTOs and immutable data models
-- Nullable reference types enabled (`<Nullable>enable</Nullable>`)
-- Use minimal API approach for endpoint definitions
-- Method naming: PascalCase for methods, camelCase for parameters
-- Use async/await for all database operations
-- Error handling: Return appropriate HTTP status codes (404, 400, etc.)
-- Prefer LINQ for database queries
+- C# 12 with nullable reference types enabled
+- Use record types for DTOs and immutable data models
+- Minimal API approach for endpoint definitions
+- Async/await for all IO and database operations
+- Error handling with appropriate HTTP status codes
+- LINQ for database queries with strong typing
+- JWT authentication with Google Auth integration
 
 ## Project Structure
-- Entity models and DbContext in separate files
-- Use of DotNetEnv for environment variable management
-- SQL Server for production, SQLite for development
-- Entity Framework Core for data access
+- Features folder for domain-specific endpoints
+- Data folder for DbContext and migrations
+- Models folder for entity definitions
+- Services folder for business logic
+- SQL Server (prod) / SQLite (dev) with EF Core
 - Swagger/OpenAPI for API documentation
