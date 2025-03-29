@@ -131,59 +131,99 @@ namespace SpotMapApi.Features.Markers
             }).WithName("RateMarker").RequireAuthorization().WithOpenApi();
             
             // Upload image to marker
-            endpoints.MapPost("/api/markers/{id}/images", async (int id, HttpRequest request, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            endpoints.MapPost("/api/markers/{id}/images", async (int id, HttpRequest request, IMarkerService markerService, HttpContext httpContext, IWebHostEnvironment webHostEnv, ILogger<Program> logger) =>
             {
-                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                
-                if (string.IsNullOrEmpty(userId))
+                try
                 {
-                    return Results.Unauthorized();
+                    var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        return Results.Unauthorized();
+                    }
+                    
+                    // Log debug info about environment
+                    logger.LogInformation($"WebRootPath: {webHostEnv.WebRootPath}");
+                    logger.LogInformation($"ContentRootPath: {webHostEnv.ContentRootPath}");
+                    
+                    // Ensure upload directory exists
+                    var uploadsPath = Path.Combine(webHostEnv.WebRootPath, "uploads", "markers");
+                    Directory.CreateDirectory(uploadsPath);
+                    
+                    var form = await request.ReadFormAsync();
+                    var file = form.Files["image"];
+                    bool.TryParse(form["isMainImage"], out bool isMainImage);
+                    
+                    if (file == null || file.Length == 0)
+                    {
+                        return Results.BadRequest(new { error = "No image file provided" });
+                    }
+                    
+                    logger.LogInformation($"Received file: {file.FileName}, Size: {file.Length} bytes, Content-Type: {file.ContentType}");
+                    
+                    var marker = await markerService.UploadImageAsync(id, file, isMainImage, userId);
+                    
+                    if (marker == null)
+                    {
+                        return Results.NotFound(new { error = "Marker not found or you don't have permission to modify it" });
+                    }
+                    
+                    logger.LogInformation($"Image uploaded for marker {id}, isMainImage: {isMainImage}");
+                    return Results.Ok(marker);
                 }
-                
-                var form = await request.ReadFormAsync();
-                var file = form.Files["image"];
-                bool.TryParse(form["isMainImage"], out bool isMainImage);
-                
-                if (file == null || file.Length == 0)
+                catch (Exception ex)
                 {
-                    return Results.BadRequest(new { error = "No image file provided" });
+                    logger.LogError(ex, "Error uploading image");
+                    return Results.Problem(
+                        title: "Error uploading image",
+                        detail: ex.Message,
+                        statusCode: 500
+                    );
                 }
-                
-                var marker = await markerService.UploadImageAsync(id, file, isMainImage, userId);
-                
-                if (marker == null)
-                {
-                    return Results.NotFound();
-                }
-                
-                logger.LogInformation($"Image uploaded for marker {id}, isMainImage: {isMainImage}");
-                return Results.Ok(marker);
             }).WithName("UploadMarkerImage").RequireAuthorization().WithOpenApi();
             
             // Delete image from marker
-            endpoints.MapDelete("/api/markers/{id}/images", async (int id, string imageUrl, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            endpoints.MapDelete("/api/markers/{id}/images", async (int id, string imageUrl, IMarkerService markerService, HttpContext httpContext, IWebHostEnvironment webHostEnv, ILogger<Program> logger) =>
             {
-                var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                
-                if (string.IsNullOrEmpty(userId))
+                try
                 {
-                    return Results.Unauthorized();
+                    var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        return Results.Unauthorized();
+                    }
+                    
+                    // Log debug info
+                    logger.LogInformation($"WebRootPath: {webHostEnv.WebRootPath}");
+                    logger.LogInformation($"ContentRootPath: {webHostEnv.ContentRootPath}");
+                    
+                    if (string.IsNullOrEmpty(imageUrl))
+                    {
+                        return Results.BadRequest(new { error = "Image URL is required" });
+                    }
+                    
+                    logger.LogInformation($"Attempting to delete image: {imageUrl} for marker {id}");
+                    
+                    var marker = await markerService.DeleteImageAsync(id, imageUrl, userId);
+                    
+                    if (marker == null)
+                    {
+                        return Results.NotFound(new { error = "Marker or image not found, or you don't have permission to modify it" });
+                    }
+                    
+                    logger.LogInformation($"Image deleted for marker {id}: {imageUrl}");
+                    return Results.Ok(marker);
                 }
-                
-                if (string.IsNullOrEmpty(imageUrl))
+                catch (Exception ex)
                 {
-                    return Results.BadRequest(new { error = "Image URL is required" });
+                    logger.LogError(ex, "Error deleting image");
+                    return Results.Problem(
+                        title: "Error deleting image",
+                        detail: ex.Message,
+                        statusCode: 500
+                    );
                 }
-                
-                var marker = await markerService.DeleteImageAsync(id, imageUrl, userId);
-                
-                if (marker == null)
-                {
-                    return Results.NotFound();
-                }
-                
-                logger.LogInformation($"Image deleted for marker {id}: {imageUrl}");
-                return Results.Ok(marker);
             }).WithName("DeleteMarkerImage").RequireAuthorization().WithOpenApi();
         }
     }

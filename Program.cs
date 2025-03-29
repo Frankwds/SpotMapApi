@@ -14,7 +14,11 @@ using SpotMapApi.Infrastructure.Configuration;
 // Load environment variables from .env file
 Env.Load();
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")
+});
 
 // Configure typed settings from environment variables
 var jwtSettings = new JwtSettings
@@ -133,15 +137,22 @@ app.UseStaticFiles(); // For serving images
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Initialize the database
+// Initialize the database and create directories
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<ApplicationDbContext>();
     var logger = services.GetRequiredService<ILogger<Program>>();
+    var environment = services.GetRequiredService<IWebHostEnvironment>();
 
     try
     {
+        // Create wwwroot and uploads directories
+        logger.LogInformation("Creating image upload directories");
+        var uploadsPath = Path.Combine(environment.WebRootPath, "uploads", "markers");
+        Directory.CreateDirectory(uploadsPath);
+        logger.LogInformation($"Created directory structure at: {uploadsPath}");
+        
         // Early development - recreate database to ensure fresh schema
         logger.LogInformation("Recreating database with latest schema");
         // context.Database.EnsureDeleted(); //TODO delete line
@@ -151,7 +162,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while initializing the database");
+        logger.LogError(ex, "An error occurred while initializing the database or creating directories");
     }
 }
 

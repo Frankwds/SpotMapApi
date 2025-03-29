@@ -166,6 +166,20 @@ namespace SpotMapApi.Services.Markers
                 return null;
             }
 
+            // Make sure WebRootPath is available and create it if needed
+            if (string.IsNullOrEmpty(_environment.WebRootPath))
+            {
+                var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                _logger.LogWarning($"WebRootPath was null. Creating directory at: {webRootPath}");
+                Directory.CreateDirectory(webRootPath);
+                
+                // Use reflection to set the WebRootPath property since it might be read-only
+                typeof(IWebHostEnvironment)
+                    .GetProperty("WebRootPath")
+                    ?.SetValue(_environment, webRootPath);
+            }
+            
+            // Create the uploads directory structure
             var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "markers");
             Directory.CreateDirectory(uploadsFolder); // Ensure directory exists
             
@@ -275,12 +289,24 @@ namespace SpotMapApi.Services.Markers
             {
                 // Extract file path from URL
                 var fileName = Path.GetFileName(imageUrl);
+                
+                // Make sure WebRootPath is available 
+                if (string.IsNullOrEmpty(_environment.WebRootPath))
+                {
+                    _logger.LogWarning("WebRootPath is null when trying to delete file");
+                    return;
+                }
+                
                 var filePath = Path.Combine(_environment.WebRootPath, "uploads", "markers", fileName);
                 
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
                     _logger.LogInformation($"Deleted image file: {filePath}");
+                }
+                else
+                {
+                    _logger.LogWarning($"File not found when trying to delete: {filePath}");
                 }
             }
             catch (Exception ex)
