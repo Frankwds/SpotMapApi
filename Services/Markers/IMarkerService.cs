@@ -5,10 +5,10 @@ namespace SpotMapApi.Services.Markers
 {
     public interface IMarkerService
     {
-        Task<IEnumerable<Marker>> GetAllMarkersAsync();
-        Task<IEnumerable<Marker>> GetMarkersByUserIdAsync(string userId);
-        Task<Marker?> GetMarkerByIdAsync(int id);
-        Task<Marker> CreateMarkerAsync(MarkerPost markerPost, string userId);
+        Task<IEnumerable<MarkerResponse>> GetAllMarkersAsync();
+        Task<IEnumerable<MarkerResponse>> GetMarkersByUserIdAsync(string userId);
+        Task<MarkerResponse?> GetMarkerByIdAsync(int id);
+        Task<MarkerResponse> CreateMarkerAsync(MarkerPost markerPost, string userId);
         Task<bool> DeleteMarkerAsync(int id, string userId);
     }
 }

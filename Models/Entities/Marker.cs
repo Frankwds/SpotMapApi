@@ -10,9 +10,7 @@ namespace SpotMapApi.Models.Entities
         public Coordinates Position { get; set; } = new Coordinates(0, 0);
         public string Type { get; set; } = string.Empty;
         public string? UserId { get; set; }
-
         public User? User { get; set; }
-        
         // New properties to support future functionality
         public string? Description { get; set; }
         public string? ImageUrl { get; set; }

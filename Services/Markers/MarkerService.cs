@@ -15,23 +15,26 @@ namespace SpotMapApi.Services.Markers
             _logger = logger;
         }
 
-        public async Task<IEnumerable<Marker>> GetAllMarkersAsync()
+        public async Task<IEnumerable<MarkerResponse>> GetAllMarkersAsync()
         {
             _logger.LogInformation("Getting all markers");
-            return await _unitOfWork.Markers.GetAllAsync();
+            var markers = await _unitOfWork.Markers.GetAllAsync();
+            return markers.Select(MapToMarkerResponse);
         }
 
-        public async Task<IEnumerable<Marker>> GetMarkersByUserIdAsync(string userId)
+        public async Task<IEnumerable<MarkerResponse>> GetMarkersByUserIdAsync(string userId)
         {
-            return await _unitOfWork.Markers.GetMarkersByUserIdAsync(userId);
+            var markers = await _unitOfWork.Markers.GetMarkersByUserIdAsync(userId);
+            return markers.Select(MapToMarkerResponse);
         }
 
-        public async Task<Marker?> GetMarkerByIdAsync(int id)
+        public async Task<MarkerResponse?> GetMarkerByIdAsync(int id)
         {
-            return await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            return marker != null ? MapToMarkerResponse(marker) : null;
         }
 
-        public async Task<Marker> CreateMarkerAsync(MarkerPost markerPost, string userId)
+        public async Task<MarkerResponse> CreateMarkerAsync(MarkerPost markerPost, string userId)
         {
             var newMarker = new Marker
             {
@@ -45,7 +48,7 @@ namespace SpotMapApi.Services.Markers
             await _unitOfWork.SaveChangesAsync();
             
             _logger.LogInformation($"Marker was added: {newMarker.Id}");
-            return newMarker;
+            return MapToMarkerResponse(newMarker);
         }
 
         public async Task<bool> DeleteMarkerAsync(int id, string userId)
@@ -68,6 +71,18 @@ namespace SpotMapApi.Services.Markers
             
             _logger.LogInformation($"Marker was deleted. id: {id}");
             return true;
+        }
+
+        private static MarkerResponse MapToMarkerResponse(Marker marker)
+        {
+            return new MarkerResponse(
+                marker.Id,
+                marker.Name,
+                marker.Position,
+                marker.Type,
+                marker.UserId ?? string.Empty,
+                marker.User?.Name
+            );
         }
     }
 }

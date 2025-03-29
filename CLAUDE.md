@@ -23,5 +23,5 @@
 - Data folder for DbContext and migrations
 - Models folder for entity definitions
 - Services folder for business logic
-- SQL Server (prod) / SQLite (dev) with EF Core
+- SQL Server with EF Core
 - Swagger/OpenAPI for API documentation
