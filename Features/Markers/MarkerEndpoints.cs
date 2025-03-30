@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using System.Security.Claims;
 using SpotMapApi.Models.DTOs;
 using SpotMapApi.Services.Markers;
+using System.IO;
 
 namespace SpotMapApi.Features.Markers
 {
@@ -225,6 +226,59 @@ namespace SpotMapApi.Features.Markers
                     );
                 }
             }).WithName("DeleteMarkerImage").RequireAuthorization().WithOpenApi();
+            
+            // Get image by filename
+            endpoints.MapGet("/api/images/{filename}", async (string filename, HttpContext httpContext, IWebHostEnvironment webHostEnv, ILogger<Program> logger) =>
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(filename))
+                    {
+                        return Results.BadRequest(new { error = "Filename is required" });
+                    }
+                    
+                    // Sanitize the filename to prevent directory traversal attacks
+                    filename = Path.GetFileName(filename);
+                    
+                    var imagePath = Path.Combine(webHostEnv.WebRootPath, "uploads", "markers", filename);
+                    
+                    if (!File.Exists(imagePath))
+                    {
+                        logger.LogWarning($"Image not found: {imagePath}");
+                        return Results.NotFound(new { error = "Image not found" });
+                    }
+                    
+                    var contentType = GetContentType(filename);
+                    var imageBytes = await File.ReadAllBytesAsync(imagePath);
+                    
+                    logger.LogInformation($"Serving image: {filename}, Size: {imageBytes.Length} bytes, Content-Type: {contentType}");
+                    return Results.File(imageBytes, contentType);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error serving image");
+                    return Results.Problem(
+                        title: "Error serving image",
+                        detail: ex.Message,
+                        statusCode: 500
+                    );
+                }
+            }).WithName("GetImage").WithOpenApi();
+        }
+        
+        private static string GetContentType(string fileName)
+        {
+            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".webp" => "image/webp",
+                ".bmp" => "image/bmp",
+                ".svg" => "image/svg+xml",
+                _ => "application/octet-stream"
+            };
         }
     }
 }

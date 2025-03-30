@@ -180,7 +180,7 @@ namespace SpotMapApi.Services.Markers
             }
             
             // Create the uploads directory structure
-            var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "markers");
+            var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "images");
             Directory.CreateDirectory(uploadsFolder); // Ensure directory exists
             
             var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
@@ -191,7 +191,7 @@ namespace SpotMapApi.Services.Markers
                 await image.CopyToAsync(fileStream);
             }
             
-            var imageUrl = $"/uploads/markers/{uniqueFileName}";
+            var imageUrl = $"/uploads/images/{uniqueFileName}";
             
             if (isMainImage)
             {
@@ -264,8 +264,42 @@ namespace SpotMapApi.Services.Markers
             return MapToMarkerResponse(marker);
         }
 
-        private static MarkerResponse MapToMarkerResponse(Marker marker)
+        private MarkerResponse MapToMarkerResponse(Marker marker)
         {
+            // Get the base URL for the API (without the scheme and host, just the base path)
+            var baseUrl = ""; // Empty string for relative URLs
+            
+            // Process the main image URL if it exists
+            string? processedImageUrl = marker.ImageUrl;
+            if (!string.IsNullOrEmpty(marker.ImageUrl))
+            {
+                // Ensure the URL is correctly formatted
+                if (marker.ImageUrl.StartsWith("/uploads/markers/") || marker.ImageUrl.StartsWith("/api/marker-image/"))
+                {
+                    var filename = Path.GetFileName(marker.ImageUrl);
+                    // Make it accessible via /uploads/images path
+                    processedImageUrl = $"{baseUrl}/uploads/images/{filename}";
+                    _logger.LogInformation($"Mapped image URL from {marker.ImageUrl} to {processedImageUrl}");
+                }
+            }
+            
+            // Process additional images
+            var processedAdditionalImages = marker.AdditionalImages?
+                .Select(img => 
+                {
+                    if (string.IsNullOrEmpty(img.ImageUrl))
+                        return img.ImageUrl;
+                    
+                    if (img.ImageUrl.StartsWith("/uploads/markers/") || img.ImageUrl.StartsWith("/api/marker-image/"))
+                    {
+                        var filename = Path.GetFileName(img.ImageUrl);
+                        return $"{baseUrl}/uploads/images/{filename}";
+                    }
+                    
+                    return img.ImageUrl;
+                })
+                .ToList();
+                
             return new MarkerResponse(
                 marker.Id,
                 marker.Name,
@@ -274,9 +308,9 @@ namespace SpotMapApi.Services.Markers
                 marker.UserId ?? string.Empty,
                 marker.User?.Name,
                 marker.Description,
-                marker.ImageUrl,
+                processedImageUrl,
                 marker.Rating,
-                marker.AdditionalImages?.Select(img => img.ImageUrl).ToList()
+                processedAdditionalImages
             );
         }
         
@@ -297,16 +331,23 @@ namespace SpotMapApi.Services.Markers
                     return;
                 }
                 
-                var filePath = Path.Combine(_environment.WebRootPath, "uploads", "markers", fileName);
+                // Check both directories for the file
+                var markerPath = Path.Combine(_environment.WebRootPath, "uploads", "markers", fileName);
+                var imagePath = Path.Combine(_environment.WebRootPath, "uploads", "images", fileName);
                 
-                if (File.Exists(filePath))
+                if (File.Exists(imagePath))
                 {
-                    File.Delete(filePath);
-                    _logger.LogInformation($"Deleted image file: {filePath}");
+                    File.Delete(imagePath);
+                    _logger.LogInformation($"Deleted image file from images directory: {imagePath}");
+                }
+                else if (File.Exists(markerPath))
+                {
+                    File.Delete(markerPath);
+                    _logger.LogInformation($"Deleted image file from markers directory: {markerPath}");
                 }
                 else
                 {
-                    _logger.LogWarning($"File not found when trying to delete: {filePath}");
+                    _logger.LogWarning($"File not found when trying to delete: {fileName}");
                 }
             }
             catch (Exception ex)

@@ -9,7 +9,9 @@ using SpotMapApi.Services.Auth;
 using SpotMapApi.Services.Markers;
 using SpotMapApi.Features.Auth;
 using SpotMapApi.Features.Markers;
+using SpotMapApi.Features.Images;
 using SpotMapApi.Infrastructure.Configuration;
+using Microsoft.Extensions.FileProviders;
 
 // Load environment variables from .env file
 Env.Load();
@@ -133,7 +135,13 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors(MyAllowSpecificOrigins);
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // For serving images
+// Configure static files with explicit options
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+    RequestPath = ""
+});
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -149,9 +157,11 @@ using (var scope = app.Services.CreateScope())
     {
         // Create wwwroot and uploads directories
         logger.LogInformation("Creating image upload directories");
-        var uploadsPath = Path.Combine(environment.WebRootPath, "uploads", "markers");
-        Directory.CreateDirectory(uploadsPath);
-        logger.LogInformation($"Created directory structure at: {uploadsPath}");
+        var markersPath = Path.Combine(environment.WebRootPath, "uploads", "markers");
+        var imagesPath = Path.Combine(environment.WebRootPath, "uploads", "images");
+        Directory.CreateDirectory(markersPath);
+        Directory.CreateDirectory(imagesPath);
+        logger.LogInformation($"Created directory structures at: {markersPath} and {imagesPath}");
         
         // Early development - recreate database to ensure fresh schema
         logger.LogInformation("Recreating database with latest schema");
@@ -170,5 +180,6 @@ using (var scope = app.Services.CreateScope())
 // Map API endpoints
 app.MapAuthEndpoints();
 app.MapMarkerEndpoints();
+app.MapImageEndpoints();
 
 app.Run();
