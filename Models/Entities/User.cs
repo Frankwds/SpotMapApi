@@ -13,5 +13,7 @@ namespace SpotMapApi.Models.Entities
         public DateTime? RefreshTokenExpiryTime { get; set; }
 
         public List<Marker> Markers { get; set; } = new List<Marker>();
+        public List<MarkerImage> Images { get; set; } = new List<MarkerImage>();
+        public List<MarkerRating> Ratings { get; set; } = new List<MarkerRating>();
     }
 }

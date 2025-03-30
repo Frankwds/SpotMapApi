@@ -24,19 +24,42 @@ namespace SpotMapApi.Services.Markers
         public async Task<IEnumerable<MarkerResponse>> GetAllMarkersAsync()
         {
             _logger.LogInformation("Getting all markers");
-            var markers = await _unitOfWork.Markers.GetAllAsync();
+            var markers = await _unitOfWork.Markers.GetAllAsync(
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             return markers.Select(MapToMarkerResponse);
         }
 
         public async Task<IEnumerable<MarkerResponse>> GetMarkersByUserIdAsync(string userId)
         {
-            var markers = await _unitOfWork.Markers.GetMarkersByUserIdAsync(userId);
+            var markers = await _unitOfWork.Markers.FindAsync(
+                m => m.UserId == userId,
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             return markers.Select(MapToMarkerResponse);
         }
 
         public async Task<MarkerResponse?> GetMarkerByIdAsync(int id)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id, 
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             return marker != null ? MapToMarkerResponse(marker) : null;
         }
 
@@ -59,7 +82,12 @@ namespace SpotMapApi.Services.Markers
 
         public async Task<bool> DeleteMarkerAsync(int id, string userId)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id,
+                include: marker => marker
+                    .Include(m => m.AdditionalImages)
+                    .Include(m => m.Ratings)
+            );
             
             if (marker == null)
             {
@@ -93,7 +121,15 @@ namespace SpotMapApi.Services.Markers
         
         public async Task<MarkerResponse?> UpdateMarkerAsync(int id, MarkerUpdateRequest request, string userId)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id,
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             
             if (marker == null)
             {
@@ -126,37 +162,76 @@ namespace SpotMapApi.Services.Markers
             return MapToMarkerResponse(marker);
         }
 
-        public async Task<MarkerResponse?> RateMarkerAsync(int id, double rating, string userId)
+        public async Task<MarkerResponse?> RateMarkerAsync(int id, int ratingValue, string userId)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id,
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             
             if (marker == null)
             {
                 return null;
             }
 
-            // Allow any authenticated user to rate a marker
-            marker.Rating = rating;
+            // Check if the user has already rated this marker
+            var existingRating = marker.Ratings.FirstOrDefault(r => r.UserId == userId);
+            
+            if (existingRating != null)
+            {
+                // Update existing rating
+                existingRating.Value = ratingValue;
+            }
+            else
+            {
+                // Add new rating
+                var newRating = new MarkerRating
+                {
+                    MarkerId = marker.Id,
+                    UserId = userId,
+                    Value = ratingValue
+                };
+                
+                marker.Ratings.Add(newRating);
+            }
+            
+            // Calculate average rating
+            if (marker.Ratings.Any())
+            {
+                marker.Rating = marker.Ratings.Average(r => r.Value);
+            }
 
-            await _unitOfWork.Markers.UpdateAsync(marker);
             await _unitOfWork.SaveChangesAsync();
             
-            _logger.LogInformation($"Marker {id} was rated {rating} by user {userId}");
+            _logger.LogInformation($"Marker {id} was rated {ratingValue} by user {userId}");
             return MapToMarkerResponse(marker);
         }
 
         public async Task<MarkerResponse?> UploadImageAsync(int id, IFormFile image, bool isMainImage, string userId)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id,
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             
             if (marker == null)
             {
                 return null;
             }
 
-            if (marker.UserId != userId)
+            if (marker.UserId != userId && isMainImage)
             {
-                _logger.LogWarning($"Unauthorized attempt to upload image for marker {id} by user {userId}");
+                _logger.LogWarning($"Unauthorized attempt to upload main image for marker {id} by user {userId}");
                 return null;
             }
 
@@ -195,6 +270,15 @@ namespace SpotMapApi.Services.Markers
             
             if (isMainImage)
             {
+                // Only marker owner can change main image
+                if (marker.UserId != userId)
+                {
+                    _logger.LogWarning($"Unauthorized attempt to change main image for marker {id} by user {userId}");
+                    // Delete the uploaded file
+                    DeleteImageFile(imageUrl);
+                    return null;
+                }
+                
                 // Delete previous main image if exists
                 if (!string.IsNullOrEmpty(marker.ImageUrl))
                 {
@@ -209,7 +293,8 @@ namespace SpotMapApi.Services.Markers
                 var newImage = new MarkerImage
                 {
                     MarkerId = marker.Id,
-                    ImageUrl = imageUrl
+                    ImageUrl = imageUrl,
+                    UserId = userId
                 };
                 
                 marker.AdditionalImages.Add(newImage);
@@ -223,21 +308,30 @@ namespace SpotMapApi.Services.Markers
 
         public async Task<MarkerResponse?> DeleteImageAsync(int id, string imageUrl, string userId)
         {
-            var marker = await _unitOfWork.Markers.GetByIdAsync(id);
+            var marker = await _unitOfWork.Markers.GetByIdAsync(
+                id,
+                include: marker => marker
+                    .Include(m => m.User)
+                    .Include(m => m.AdditionalImages)
+                        .ThenInclude(i => i.User)
+                    .Include(m => m.Ratings)
+                        .ThenInclude(r => r.User)
+            );
             
             if (marker == null)
             {
                 return null;
             }
 
-            if (marker.UserId != userId)
-            {
-                _logger.LogWarning($"Unauthorized attempt to delete image for marker {id} by user {userId}");
-                return null;
-            }
-            
             if (marker.ImageUrl == imageUrl)
             {
+                // Only marker owner can delete main image
+                if (marker.UserId != userId)
+                {
+                    _logger.LogWarning($"Unauthorized attempt to delete main image for marker {id} by user {userId}");
+                    return null;
+                }
+                
                 // Delete main image
                 DeleteImageFile(imageUrl);
                 marker.ImageUrl = null;
@@ -248,6 +342,13 @@ namespace SpotMapApi.Services.Markers
                 var imageToDelete = marker.AdditionalImages.FirstOrDefault(i => i.ImageUrl == imageUrl);
                 if (imageToDelete != null)
                 {
+                    // Only marker owner or image owner can delete additional images
+                    if (marker.UserId != userId && imageToDelete.UserId != userId)
+                    {
+                        _logger.LogWarning($"Unauthorized attempt to delete image for marker {id} by user {userId}");
+                        return null;
+                    }
+                    
                     marker.AdditionalImages.Remove(imageToDelete);
                     DeleteImageFile(imageUrl);
                 }
@@ -262,6 +363,36 @@ namespace SpotMapApi.Services.Markers
             
             _logger.LogInformation($"Image {imageUrl} deleted for marker {id}");
             return MapToMarkerResponse(marker);
+        }
+        
+        public async Task<bool> DeleteAdditionalImageAsync(int imageId, string userId)
+        {
+            var image = await _unitOfWork.Context.Set<MarkerImage>()
+                .Include(i => i.Marker)
+                .FirstOrDefaultAsync(i => i.Id == imageId);
+                
+            if (image == null)
+            {
+                _logger.LogWarning($"Image with ID {imageId} not found");
+                return false;
+            }
+            
+            // Check permissions - only marker owner or image owner can delete
+            if (image.UserId != userId && image.Marker?.UserId != userId)
+            {
+                _logger.LogWarning($"Unauthorized attempt to delete image {imageId} by user {userId}");
+                return false;
+            }
+            
+            // Delete the file
+            DeleteImageFile(image.ImageUrl);
+            
+            // Remove from database
+            _unitOfWork.Context.Set<MarkerImage>().Remove(image);
+            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation($"Image {imageId} deleted by user {userId}");
+            return true;
         }
 
         private MarkerResponse MapToMarkerResponse(Marker marker)
@@ -283,21 +414,31 @@ namespace SpotMapApi.Services.Markers
                 }
             }
             
-            // Process additional images
-            var processedAdditionalImages = marker.AdditionalImages?
-                .Select(img => 
-                {
-                    if (string.IsNullOrEmpty(img.ImageUrl))
-                        return img.ImageUrl;
-                    
-                    if (img.ImageUrl.StartsWith("/uploads/markers/") || img.ImageUrl.StartsWith("/api/marker-image/"))
-                    {
-                        var filename = Path.GetFileName(img.ImageUrl);
-                        return $"{baseUrl}/uploads/images/{filename}";
-                    }
-                    
-                    return img.ImageUrl;
-                })
+            // Calculate average rating
+            double? averageRating = null;
+            if (marker.Ratings.Any())
+            {
+                averageRating = marker.Ratings.Average(r => r.Value);
+            }
+            
+            // Map additional images to DTOs
+            var additionalImageDtos = marker.AdditionalImages
+                .Select(img => new MarkerImageDto(
+                    img.Id,
+                    img.ImageUrl,
+                    img.UserId,
+                    img.User?.Name
+                ))
+                .ToList();
+                
+            // Map ratings to DTOs
+            var ratingDtos = marker.Ratings
+                .Select(r => new MarkerRatingDto(
+                    r.Id,
+                    r.Value,
+                    r.UserId,
+                    r.User?.Name
+                ))
                 .ToList();
                 
             return new MarkerResponse(
@@ -309,8 +450,9 @@ namespace SpotMapApi.Services.Markers
                 marker.User?.Name,
                 marker.Description,
                 processedImageUrl,
-                marker.Rating,
-                processedAdditionalImages
+                averageRating,
+                additionalImageDtos,
+                ratingDtos
             );
         }
         

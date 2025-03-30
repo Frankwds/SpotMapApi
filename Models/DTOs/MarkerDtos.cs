@@ -15,7 +15,8 @@ namespace SpotMapApi.Models.DTOs
         string? Description = null,
         string? ImageUrl = null,
         double? Rating = null,
-        List<string>? AdditionalImages = null);
+        List<MarkerImageDto>? AdditionalImages = null,
+        List<MarkerRatingDto>? Ratings = null);
         
     public record MarkerUpdateRequest(
         string? Name = null,
@@ -23,7 +24,19 @@ namespace SpotMapApi.Models.DTOs
         string? Type = null,
         string? Description = null);
         
-    public record MarkerRatingRequest(double Rating);
+    public record MarkerRatingRequest(int Value);
     
     public record ImageUploadResponse(string ImageUrl);
+    
+    public record MarkerImageDto(
+        int Id,
+        string ImageUrl,
+        string? UserId = null,
+        string? UserName = null);
+        
+    public record MarkerRatingDto(
+        int Id,
+        int Value,
+        string UserId,
+        string? UserName = null);
 }

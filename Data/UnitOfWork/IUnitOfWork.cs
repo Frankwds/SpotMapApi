@@ -6,6 +6,7 @@ namespace SpotMapApi.Data.UnitOfWork
     {
         IMarkerRepository Markers { get; }
         IUserRepository Users { get; }
+        ApplicationDbContext Context { get; }
         Task SaveChangesAsync();
     }
 }

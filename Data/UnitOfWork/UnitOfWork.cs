@@ -15,6 +15,7 @@ namespace SpotMapApi.Data.UnitOfWork
 
         public IMarkerRepository Markers => _markerRepository ??= new MarkerRepository(_context);
         public IUserRepository Users => _userRepository ??= new UserRepository(_context);
+        public ApplicationDbContext Context => _context;
 
         public async Task SaveChangesAsync()
         {

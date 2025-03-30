@@ -120,14 +120,14 @@ namespace SpotMapApi.Features.Markers
                     return Results.Unauthorized();
                 }
                 
-                var marker = await markerService.RateMarkerAsync(id, ratingRequest.Rating, userId);
+                var marker = await markerService.RateMarkerAsync(id, ratingRequest.Value, userId);
                 
                 if (marker == null)
                 {
                     return Results.NotFound();
                 }
                 
-                logger.LogInformation($"Marker {id} was rated {ratingRequest.Rating} by user {userId}");
+                logger.LogInformation($"Marker {id} was rated {ratingRequest.Value} by user {userId}");
                 return Results.Ok(marker);
             }).WithName("RateMarker").RequireAuthorization().WithOpenApi();
             
@@ -148,7 +148,7 @@ namespace SpotMapApi.Features.Markers
                     logger.LogInformation($"ContentRootPath: {webHostEnv.ContentRootPath}");
                     
                     // Ensure upload directory exists
-                    var uploadsPath = Path.Combine(webHostEnv.WebRootPath, "uploads", "markers");
+                    var uploadsPath = Path.Combine(webHostEnv.WebRootPath, "uploads", "images");
                     Directory.CreateDirectory(uploadsPath);
                     
                     var form = await request.ReadFormAsync();
@@ -227,6 +227,39 @@ namespace SpotMapApi.Features.Markers
                 }
             }).WithName("DeleteMarkerImage").RequireAuthorization().WithOpenApi();
             
+            // Delete image by ID
+            endpoints.MapDelete("/api/images/{imageId}", async (int imageId, IMarkerService markerService, HttpContext httpContext, ILogger<Program> logger) =>
+            {
+                try
+                {
+                    var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        return Results.Unauthorized();
+                    }
+                    
+                    var result = await markerService.DeleteAdditionalImageAsync(imageId, userId);
+                    
+                    if (!result)
+                    {
+                        return Results.NotFound(new { error = "Image not found or you don't have permission to delete it" });
+                    }
+                    
+                    logger.LogInformation($"Image with ID {imageId} deleted by user {userId}");
+                    return Results.Ok(new { message = "Image deleted successfully" });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, $"Error deleting image with ID {imageId}");
+                    return Results.Problem(
+                        title: "Error deleting image",
+                        detail: ex.Message,
+                        statusCode: 500
+                    );
+                }
+            }).WithName("DeleteImageById").RequireAuthorization().WithOpenApi();
+            
             // Get image by filename
             endpoints.MapGet("/api/images/{filename}", async (string filename, HttpContext httpContext, IWebHostEnvironment webHostEnv, ILogger<Program> logger) =>
             {
@@ -240,16 +273,27 @@ namespace SpotMapApi.Features.Markers
                     // Sanitize the filename to prevent directory traversal attacks
                     filename = Path.GetFileName(filename);
                     
-                    var imagePath = Path.Combine(webHostEnv.WebRootPath, "uploads", "markers", filename);
+                    // Check both image directories
+                    var markerImagePath = Path.Combine(webHostEnv.WebRootPath, "uploads", "markers", filename);
+                    var imagePath = Path.Combine(webHostEnv.WebRootPath, "uploads", "images", filename);
                     
-                    if (!File.Exists(imagePath))
+                    string actualPath;
+                    if (File.Exists(imagePath))
                     {
-                        logger.LogWarning($"Image not found: {imagePath}");
+                        actualPath = imagePath;
+                    }
+                    else if (File.Exists(markerImagePath))
+                    {
+                        actualPath = markerImagePath;
+                    }
+                    else
+                    {
+                        logger.LogWarning($"Image not found: {filename}");
                         return Results.NotFound(new { error = "Image not found" });
                     }
                     
                     var contentType = GetContentType(filename);
-                    var imageBytes = await File.ReadAllBytesAsync(imagePath);
+                    var imageBytes = await File.ReadAllBytesAsync(actualPath);
                     
                     logger.LogInformation($"Serving image: {filename}, Size: {imageBytes.Length} bytes, Content-Type: {contentType}");
                     return Results.File(imageBytes, contentType);
