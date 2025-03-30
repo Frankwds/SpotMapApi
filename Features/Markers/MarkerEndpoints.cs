@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System;
 using System.Security.Claims;
 using SpotMapApi.Models.DTOs;
 using SpotMapApi.Services.Markers;
@@ -120,15 +121,20 @@ namespace SpotMapApi.Features.Markers
                     return Results.Unauthorized();
                 }
                 
-                var marker = await markerService.RateMarkerAsync(id, ratingRequest.Value, userId);
+                // Round the rating to the nearest whole number for the backend storage
+                // The service will handle rounding the average to the nearest 0.5
+                var ratingInt = (int)Math.Round(ratingRequest.Rating);
+                var marker = await markerService.RateMarkerAsync(id, ratingInt, userId);
                 
                 if (marker == null)
                 {
                     return Results.NotFound();
                 }
                 
-                logger.LogInformation($"Marker {id} was rated {ratingRequest.Value} by user {userId}");
-                return Results.Ok(marker);
+                logger.LogInformation($"Marker {id} was rated {ratingRequest.Rating} by user {userId}");
+                
+                // Return only the mean rating in the format requested
+                return Results.Ok(new { meanRating = marker.Rating });
             }).WithName("RateMarker").RequireAuthorization().WithOpenApi();
             
             // Upload image to marker

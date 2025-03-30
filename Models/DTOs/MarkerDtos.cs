@@ -24,7 +24,7 @@ namespace SpotMapApi.Models.DTOs
         string? Type = null,
         string? Description = null);
         
-    public record MarkerRatingRequest(int Value);
+    public record MarkerRatingRequest(double Rating);
     
     public record ImageUploadResponse(string ImageUrl);
     

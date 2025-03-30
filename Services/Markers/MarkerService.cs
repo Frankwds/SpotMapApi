@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SpotMapApi.Data.UnitOfWork;
 using SpotMapApi.Models.DTOs;
 using SpotMapApi.Models.Entities;
+using System;
 using System.IO;
 using System.Linq;
 
@@ -203,7 +204,9 @@ namespace SpotMapApi.Services.Markers
             // Calculate average rating
             if (marker.Ratings.Any())
             {
-                marker.Rating = marker.Ratings.Average(r => r.Value);
+                double avgRating = marker.Ratings.Average(r => r.Value);
+                // Round to the nearest 0.5
+                marker.Rating = Math.Round(avgRating * 2, MidpointRounding.AwayFromZero) / 2;
             }
 
             await _unitOfWork.SaveChangesAsync();
